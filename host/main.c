@@ -52,40 +52,39 @@ typedef struct __word {
 // caesar start
 
 void caesar_gen_keys(ta_attrs *ta) {
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, CAESAR_GENKEY, 
-        NULL, NULL);
+	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, CAESAR_GENKEY, NULL, NULL);
 	if (res != TEEC_SUCCESS)
-		errx(1, "\nTEEC_InvokeCommand(TA_TEEENCRYPT_CMD_GEN_CAESAR) failed %#x\n", res);
+		errx(1, "!> TEEC_InvokeCommand(CAESAR_GENKEY) failed %#x\n", res);
     
-	puts("\n=========== Keys already generated. ==========");
+	puts("> Keys already generated.");
 }
 
 void caesar_encrypt(ta_attrs *ta, TEEC_Operation* op) {
-	puts("\n============ RSA ENCRYPT CA SIDE ============");
+	puts("> CAESAR ENCRYPT CA SIDE");
     
 	uint32_t origin;
 
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, CAESAR_ENC,
-				 op, &origin);
+	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, CAESAR_ENC, op, &origin);
 	if (res != TEEC_SUCCESS)
-		errx(1, "\nTEEC_InvokeCommand(TA_TEEENCRYPT_CMD_ENC_CAESAR) failed 0x%x origin 0x%x\n",
+		errx(1, "!> TEEC_InvokeCommand(CAESAR_ENC) failed 0x%x origin 0x%x\n",
 			res, origin);
 
-	printf("\nThe text sent was encrypted: %s\n", (char *)op->params[1].tmpref.buffer);
+	printf("> The text sent was encrypted: %s\n", 
+		(char *)op->params[1].tmpref.buffer);
 }
 
 void caesar_decrypt(ta_attrs *ta, TEEC_Operation* op) {
-	puts("\n============ RSA DECRYPT CA SIDE ============");
+	puts("> CAESAR DECRYPT CA SIDE");
 
 	uint32_t origin;
 
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, CAESAR_DEC, 
-                op, &origin);
+	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, CAESAR_DEC, op, &origin);
 	if (res != TEEC_SUCCESS)
-		errx(1, "\nTEEC_InvokeCommand(TA_TEEENCRYPT_CMD_DEC_CAESAR) failed 0x%x origin 0x%x\n",
+		errx(1, "!> TEEC_InvokeCommand(CAESAR_DEC) failed 0x%x origin 0x%x\n",
 			res, origin);
 
-	printf("\nThe text sent was decrypted: %s\n", (char *)op->params[1].tmpref.buffer);
+	printf("> The text sent was decrypted: %s\n", 
+		(char *)op->params[1].tmpref.buffer);
 }
 
 // caesar end
@@ -93,27 +92,23 @@ void caesar_decrypt(ta_attrs *ta, TEEC_Operation* op) {
 // rsa start
 
 void rsa_gen_keys(ta_attrs *ta) {
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, RSA_GENKEY, 
-		NULL, NULL);
+	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, RSA_GENKEY, NULL, NULL);
 	if (res != TEEC_SUCCESS)
-		errx(1, "\nTEEC_InvokeCommand(TA_RSA_CMD_GENKEYS) failed %#x\n", res);
+		errx(1, "!> TEEC_InvokeCommand(RSA_GENKEYS) failed %#x\n", res);
 
-	puts("\n=========== Keys already generated. ==========");
+	puts("> Keys already generated.");
 }
 
-void rsa_encrypt(ta_attrs *ta, TEEC_Operation* op)
-{
-	puts("\n============ RSA ENCRYPT CA SIDE ============");
+void rsa_encrypt(ta_attrs *ta, TEEC_Operation* op) {
+	puts("> RSA ENCRYPT CA SIDE");
 
 	uint32_t origin;
-
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, RSA_ENC,
-				 op, &origin);
+	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, RSA_ENC, op, &origin);
 	if (res != TEEC_SUCCESS)
-		errx(1, "\nTEEC_InvokeCommand(TA_RSA_CMD_ENCRYPT) failed 0x%x origin 0x%x\n",
+		errx(1, "!> TEEC_InvokeCommand(TA_RSA_CMD_ENCRYPT) failed 0x%x origin 0x%x\n",
 			res, origin);
 
-	printf("\nThe text sent was encrypted: %s\n", (char *)op->params[1].tmpref.buffer);
+	printf("> The text sent was encrypted: %s\n", (char *)op->params[1].tmpref.buffer);
 }
 
 // void rsa_decrypt(ta_attrs *ta, TEEC_Operation* op)
@@ -141,26 +136,24 @@ static size_t get_file_size(FILE* fp) {
 	return fileSize;
 }
 
-static void prepare_ta_session(ta_attrs *ta)
-{
+static void prepare_ta_session(ta_attrs *ta) {
 	TEEC_UUID uuid = TA_TEEENCRYPT_UUID;
 	uint32_t origin;
 
 	/* Initialize a context connecting us to the TEE */
 	TEEC_Result res = TEEC_InitializeContext(NULL, &ta->ctx);
 	if (res != TEEC_SUCCESS)
-		errx(1, "\nTEEC_InitializeContext failed with code 0x%x\n", res);
+		errx(1, "!> TEEC_InitializeContext failed with code 0x%x\n", res);
 
 	/* Open a session with the TA */
 	res = TEEC_OpenSession(&ta->ctx, &ta->sess, &uuid,
 			       TEEC_LOGIN_PUBLIC, NULL, NULL, &origin);
 	if (res != TEEC_SUCCESS)
-		errx(1, "\nTEEC_Opensession failed with code 0x%x origin 0x%x\n", 
+		errx(1, "!> TEEC_Opensession failed with code 0x%x origin 0x%x\n", 
 			res, origin);
 }
 
-static void terminate_tee_session(ta_attrs *ta)
-{
+static void terminate_tee_session(ta_attrs *ta) {
 	TEEC_CloseSession(&ta->sess);
 	TEEC_FinalizeContext(&ta->ctx);
 }
@@ -180,10 +173,9 @@ static void prepare_op(TEEC_Operation *op, word data[]) {
 	}
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
 	if (4 != argc) {
-		perror(">> complete 4 words (ex. teeencrypt -e data.txt caesar)");
+		perror("> complete 4 words (ex. teeencrypt -e data.txt caesar)");
 		return 1;
 	}
 
@@ -194,12 +186,12 @@ int main(int argc, char* argv[])
 
 	FILE* fp = fopen(argv[2], "r+");
 	if (fp == NULL) {
-		perror(">> file not found");
+		perror("!> file not found");
 		return 1;
 	}
 
 	size_t fileSize = get_file_size(fp);
-	puts(">> file detected");
+	puts("> file detected");
 
 	word data[TEEC_CONFIG_PAYLOAD_REF_COUNT] = {NULL, };
 	char fileName[PATH_MAX];
@@ -216,6 +208,7 @@ int main(int argc, char* argv[])
 		if (!strcmp(argv[1], "-e")) {
 			caesar_gen_keys(&ta);
 			caesar_encrypt(&ta, &op);
+
 			fp = freopen(fileName, "w", fp);
 			fwrite(data[1].buffer, 1, data[1].size, fp);
 			fputc('\n', fp);
@@ -225,13 +218,14 @@ int main(int argc, char* argv[])
 		}
 		else if (!strcmp(argv[1], "-d")) {
 			caesar_decrypt(&ta, &op);
+			
 			fp = freopen(fileName, "w", fp);
 			fwrite(data[1].buffer, 1, data[1].size - 1, fp);
 
 			strcpy(modifiedFileName, fileName);
 			char* ptr = strrchr(modifiedFileName, '.');
 			if (strcmp(ptr, ".caesar")) {
-				perror("ERROR: Not encrypted file(.caesar)");
+				perror("!> ERROR: Not encrypted file(.caesar)");
 				return 1;
 			}
 			memset(ptr, 0, strlen(ptr));
@@ -251,6 +245,7 @@ int main(int argc, char* argv[])
 
 			rsa_gen_keys(&ta);
 			rsa_encrypt(&ta, &op);
+
 			fp = freopen(data[2].buffer, "w", fp);
 			fwrite(data[1].buffer, 1, data[1].size, fp);
 
@@ -271,11 +266,11 @@ int main(int argc, char* argv[])
 		else{
 			goto no_option;
 		}
-		rename(data[2].buffer, data[3].buffer);
+		rename(fileName, modifiedFileName);
 	}
 	else {
 no_option:
-		puts(">>> no option found");
+		puts("!> no option found");
 	}
 
 	fclose(fp);

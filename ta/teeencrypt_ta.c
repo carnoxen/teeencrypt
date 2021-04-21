@@ -64,19 +64,38 @@ static unsigned char dec_letter(unsigned char c) {
 	return c;
 }
 
-TEE_Result caesar_create_key()
-{
+static TEE_Result check_params(uint32_t param_types) {
+	const uint32_t exp_param_types =
+		TEE_PARAM_TYPES(
+			TEE_PARAM_TYPE_MEMREF_INPUT,
+			TEE_PARAM_TYPE_MEMREF_OUTPUT,
+			TEE_PARAM_TYPE_NONE,
+			TEE_PARAM_TYPE_NONE
+		);
+
+	DMSG("> Checking parameters...\n");
+	/* Safely get the invocation parameters */
+	if (param_types != exp_param_types) {
+		EMSG("!> Mismatched parameters\n");
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+	return TEE_SUCCESS;
+}
+
+TEE_Result caesar_create_key(void) {
 	TEE_GenerateRandom(&caesar_key, sizeof(caesar_key));
 	caesar_key = (caesar_key % (LETTERS - 1)) + 1;
 
-	DMSG("======================== Caesar: Key Generation ========================\n");
-	DMSG("Key :  %d\n", caesar_key);
+	DMSG("> Caesar: Key Generation \n");
+	DMSG(">> Key :  %d\n", caesar_key);
 
 	return TEE_SUCCESS;
 }
 
-TEE_Result caesar_encrypt(TEE_Param params[4])
-{
+TEE_Result caesar_encrypt(uint32_t param_types, TEE_Param params[4]) {
+	if (check_params(param_types) != TEE_SUCCESS)
+		return TEE_ERROR_BAD_PARAMETERS;
+
 	char* in = (char*) params[0].memref.buffer;
 	size_t in_len = params[0].memref.size;
 	char* out = (char*) params[1].memref.buffer;
@@ -88,15 +107,17 @@ TEE_Result caesar_encrypt(TEE_Param params[4])
 
 	out[out_len - 1] = caesar_key + 'A';
 
-	DMSG("======================== Caesar: Encryption ========================\n");
-	DMSG("Plaintext :  %s\n", in);
-	DMSG("Ciphertext :  %s\n", out);
+	DMSG("> Caesar: Encryption\n");
+	DMSG(">> Plaintext :  %s\n", in);
+	DMSG(">> Ciphertext :  %s\n", out);
 
 	return TEE_SUCCESS;
 }
 
-TEE_Result caesar_decrypt(TEE_Param params[4])
-{
+TEE_Result caesar_decrypt(uint32_t param_types, TEE_Param params[4]) {
+	if (check_params(param_types) != TEE_SUCCESS)
+		return TEE_ERROR_BAD_PARAMETERS;
+
 	char* in = (char*) params[0].memref.buffer;
 	size_t in_len = params[0].memref.size;
 	char* out = (char*) params[1].memref.buffer;
@@ -110,9 +131,9 @@ TEE_Result caesar_decrypt(TEE_Param params[4])
 
 	out[out_len - 2] = '\n';
 
-	DMSG("======================== Caesar: Decryption ========================\n");
-	DMSG("Ciphertext :  %s", in);
-	DMSG("Plaintext :  %s", out);
+	DMSG("> Caesar: Decryption\n");
+	DMSG(">> Ciphertext :  %s", in);
+	DMSG(">> Plaintext :  %s", out);
 
 	return TEE_SUCCESS;
 }
@@ -125,94 +146,76 @@ TEE_Result prepare_rsa_operation(TEE_OperationHandle *handle, uint32_t alg, TEE_
 	TEE_ObjectInfo key_info;
 	TEE_Result ret = TEE_GetObjectInfo1(key, &key_info);
 	if (ret != TEE_SUCCESS) {
-		EMSG("\nTEE_GetObjectInfo1: %#\n" PRIx32, ret);
+		EMSG("!> TEE_GetObjectInfo1: %#\n" PRIx32, ret);
 		return ret;
 	}
 
-	DMSG("\n==== allocate operation\n");
 	ret = TEE_AllocateOperation(handle, alg, mode, key_info.keySize);
 	if (ret != TEE_SUCCESS) {
-		EMSG("\nFailed to alloc operation handle : 0x%x\n", ret);
+		EMSG("!> Failed to alloc operation handle : 0x%x\n", ret);
 		return ret;
 	}
-	DMSG("\n========== Operation allocated successfully. ==========\n");
+	DMSG("> Operation allocated successfully.\n");
 
 	ret = TEE_SetOperationKey(*handle, key);
 	if (ret != TEE_SUCCESS) {
-		EMSG("\nFailed to set key : 0x%x\n", ret);
+		EMSG("!> Failed to set key : 0x%x\n", ret);
 		return ret;
 	}
-	DMSG("\n========== Operation key already set. ==========\n");
+	DMSG("> Operation key already set.\n");
 
 	return ret;
 }
 
-TEE_Result check_params(uint32_t param_types) {
-	const uint32_t exp_param_types =
-		TEE_PARAM_TYPES(
-			TEE_PARAM_TYPE_MEMREF_INPUT,
-			TEE_PARAM_TYPE_MEMREF_OUTPUT,
-			TEE_PARAM_TYPE_NONE,
-			TEE_PARAM_TYPE_NONE
-		);
-
-	/* Safely get the invocation parameters */
-	if (param_types != exp_param_types)
-		return TEE_ERROR_BAD_PARAMETERS;
-	return TEE_SUCCESS;
-}
-
 TEE_Result rsa_create_key_pair(void *session) {
-	TEE_Result ret;
-	size_t key_size = RSA_KEY_SIZE;
+	uint32_t key_size = RSA_KEY_SIZE;
 	struct __rsa_session *sess = (struct __rsa_session *)session;
 	
-	ret = TEE_AllocateTransientObject(TEE_TYPE_RSA_KEYPAIR, key_size, &sess->key_handle);
+	TEE_Result ret = TEE_AllocateTransientObject(TEE_TYPE_RSA_KEYPAIR, key_size, &sess->key_handle);
 	if (ret != TEE_SUCCESS) {
-		EMSG("\nFailed to alloc transient object handle: 0x%x\n", ret);
+		EMSG("!> Failed to alloc transient object handle: 0x%x\n", ret);
 		return ret;
 	}
-	DMSG("\n========== Transient object allocated. ==========\n");
+	DMSG("> Transient object allocated.\n");
 
 	ret = TEE_GenerateKey(sess->key_handle, key_size, (TEE_Attribute *)NULL, 0);
 	if (ret != TEE_SUCCESS) {
-		EMSG("\nGenerate key failure: 0x%x\n", ret);
+		EMSG("!> Generate key failure: 0x%x\n", ret);
 		return ret;
 	}
-	DMSG("\n========== Keys generated. ==========\n");
+	DMSG("> Keys generated.\n");
 	return ret;
 }
 
 TEE_Result rsa_encrypt(void *session, uint32_t param_types, TEE_Param params[4]) {
-	TEE_Result ret;
-	uint32_t rsa_alg = TEE_ALG_RSAES_PKCS1_V1_5;
-	struct __rsa_session *sess = (struct __rsa_session *)session;
-
 	if (check_params(param_types) != TEE_SUCCESS)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	void *plain_txt = params[0].memref.buffer;
-	size_t plain_len = params[0].memref.size;
-	void *cipher = params[1].memref.buffer;
-	size_t cipher_len = params[1].memref.size;
+	uint32_t rsa_alg = TEE_ALG_RSAES_PKCS1_V1_5;
+	struct __rsa_session *sess = (struct __rsa_session *)session;
 
-	DMSG("\n========== Preparing encryption operation ==========\n");
-	ret = prepare_rsa_operation(&sess->op_handle, rsa_alg, TEE_MODE_ENCRYPT, 
+	void *plain_txt = params[0].memref.buffer;
+	uint32_t plain_len = params[0].memref.size;
+	void *cipher = params[1].memref.buffer;
+	uint32_t cipher_len = params[1].memref.size;
+
+	DMSG("> Preparing encryption operation...\n");
+	TEE_Result ret = prepare_rsa_operation(&sess->op_handle, rsa_alg, TEE_MODE_ENCRYPT, 
 		sess->key_handle);
 	if (ret != TEE_SUCCESS) {
-		EMSG("\nFailed to prepare RSA operation: 0x%x\n", ret);
+		EMSG("!> Failed to prepare RSA operation: 0x%x\n", ret);
 		goto err;
 	}
 
-	DMSG("\nData to encrypt: %s\n", (char *) plain_txt);
 	ret = TEE_AsymmetricEncrypt(sess->op_handle, (TEE_Attribute *)NULL, 0,
 					plain_txt, plain_len, cipher, &cipher_len);					
 	if (ret != TEE_SUCCESS) {
-		EMSG("\nFailed to encrypt the passed buffer: 0x%x\n", ret);
+		EMSG("!> Failed to encrypt the passed buffer: 0x%x\n", ret);
 		goto err;
 	}
-	DMSG("\nEncrypted data: %s\n", (char *) cipher);
-	DMSG("\n========== Encryption successfully ==========\n");
+	DMSG("> Encryption successfully\n");
+	DMSG(">> Data to encrypt: %s\n", (char *) plain_txt);
+	DMSG(">> Encrypted data: %s\n", (char *) cipher);
 	return ret;
 
 err:
@@ -288,7 +291,7 @@ void TA_DestroyEntryPoint(void)
  */
 TEE_Result TA_OpenSessionEntryPoint(uint32_t __maybe_unused param_types,
 		TEE_Param __maybe_unused params[4],
-		void __maybe_unused **session)
+		void **session)
 {
 	rsa_session *sess = TEE_Malloc(sizeof(*sess), 0);
 	if (!sess)
@@ -298,7 +301,7 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t __maybe_unused param_types,
 	sess->op_handle = TEE_HANDLE_NULL;
 
 	*session = (void *)sess;
-	DMSG("\nSession %p: newly allocated\n", *session);
+	DMSG("> Session %p: newly allocated\n", *session);
 
 	return TEE_SUCCESS;
 }
@@ -310,7 +313,7 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t __maybe_unused param_types,
 void TA_CloseSessionEntryPoint(void *session)
 {
 	/* Get ciphering context from session ID */
-	DMSG("Session %p: release session", session);
+	DMSG("> Session %p: release session", session);
 	rsa_session* sess = (rsa_session *)session;
 
 	/* Release the session resources
@@ -327,16 +330,16 @@ void TA_CloseSessionEntryPoint(void *session)
  * assigned by TA_OpenSessionEntryPoint(). The rest of the paramters
  * comes from normal world.
  */
-TEE_Result TA_InvokeCommandEntryPoint(void __maybe_unused *session, uint32_t cmd,
-			uint32_t __maybe_unused param_types, TEE_Param params[4])
+TEE_Result TA_InvokeCommandEntryPoint(void *session, uint32_t cmd,
+			uint32_t param_types, TEE_Param params[4])
 {
 	switch (cmd) {
 	case CAESAR_GENKEY:
 		return caesar_create_key();
 	case CAESAR_ENC:
-		return caesar_encrypt(params);
+		return caesar_encrypt(param_types, params);
 	case CAESAR_DEC:
-		return caesar_decrypt(params);
+		return caesar_decrypt(param_types, params);
 
 	case RSA_GENKEY:
 		return rsa_create_key_pair(session);
@@ -346,7 +349,7 @@ TEE_Result TA_InvokeCommandEntryPoint(void __maybe_unused *session, uint32_t cmd
 	// 	return rsa_decrypt(session, param_types, params);
 
 	default:
-		EMSG("Command ID 0x%x is not supported", cmd);
+		EMSG("!> Command ID 0x%x is not supported", cmd);
 		return TEE_ERROR_NOT_SUPPORTED;
 	}
 }
