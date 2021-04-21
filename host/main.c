@@ -29,10 +29,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 
 /* OP-TEE TEE client API (built by optee_client) */
 #include <tee_client_api.h>
-#include "ta_common.h"
+#include "teeencrypt_ta.h"
 
 // common start
 
@@ -43,7 +44,7 @@ typedef struct __ta_attrs {
 
 typedef struct __word {
 	char* buffer;
-	size_t length;
+	size_t size;
 } word;
 
 // common end
@@ -115,20 +116,20 @@ void rsa_encrypt(ta_attrs *ta, TEEC_Operation* op)
 	printf("\nThe text sent was encrypted: %s\n", (char *)op->params[1].tmpref.buffer);
 }
 
-void rsa_decrypt(ta_attrs *ta, TEEC_Operation* op)
-{
-	puts("\n============ RSA DECRYPT CA SIDE ============");
+// void rsa_decrypt(ta_attrs *ta, TEEC_Operation* op)
+// {
+// 	puts("\n============ RSA DECRYPT CA SIDE ============");
 
-	uint32_t origin;
+// 	uint32_t origin;
 
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, RSA_DEC, 
-		op, &origin);
-	if (res != TEEC_SUCCESS)
-		errx(1, "\nTEEC_InvokeCommand(TA_RSA_CMD_DECRYPT) failed 0x%x origin 0x%x\n",
-			res, origin);
+// 	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, RSA_DEC, 
+// 		op, &origin);
+// 	if (res != TEEC_SUCCESS)
+// 		errx(1, "\nTEEC_InvokeCommand(TA_RSA_CMD_DECRYPT) failed 0x%x origin 0x%x\n",
+// 			res, origin);
 
-	printf("\nThe text sent was decrypted: %s\n", (char *)op->params[1].tmpref.buffer);
-}
+// 	printf("\nThe text sent was decrypted: %s\n", (char *)op->params[1].tmpref.buffer);
+// }
 
 // rsa end
 
@@ -144,10 +145,9 @@ static void prepare_ta_session(ta_attrs *ta)
 {
 	TEEC_UUID uuid = TA_TEEENCRYPT_UUID;
 	uint32_t origin;
-	TEEC_Result res;
 
 	/* Initialize a context connecting us to the TEE */
-	res = TEEC_InitializeContext(NULL, &ta->ctx);
+	TEEC_Result res = TEEC_InitializeContext(NULL, &ta->ctx);
 	if (res != TEEC_SUCCESS)
 		errx(1, "\nTEEC_InitializeContext failed with code 0x%x\n", res);
 
@@ -165,30 +165,32 @@ static void terminate_tee_session(ta_attrs *ta)
 	TEEC_FinalizeContext(&ta->ctx);
 }
 
-static void prepare_op(TEEC_Operation *op, word* in, word* out) {
+static void prepare_op(TEEC_Operation *op, word data[]) {
 	memset(op, 0, sizeof(*op));
 
-	op->paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_TEMP_INPUT,
-					 		TEEC_MEMREF_TEMP_OUTPUT,
-					 		TEEC_NONE, TEEC_NONE);
-	op->params[0].tmpref.buffer = in->buffer;
-	op->params[0].tmpref.size = in->length;
-	op->params[1].tmpref.buffer = out->buffer;
-	op->params[1].tmpref.size = out->length;
+	op->paramTypes = TEEC_PARAM_TYPES(
+		TEEC_MEMREF_TEMP_INPUT,
+		TEEC_MEMREF_TEMP_OUTPUT,
+		TEEC_NONE,
+		TEEC_NONE);
+
+	for (size_t i = 0; i < TEEC_CONFIG_PAYLOAD_REF_COUNT - 2; ++i) {
+		op->params[i].tmpref.buffer = data[i].buffer;
+		op->params[i].tmpref.size = data[i].size;
+	}
 }
 
 int main(int argc, char* argv[])
 {
-	TEEC_Result res;
-	TEEC_Operation op;
-
-	ta_attrs ta;
-	prepare_ta_session(&ta);
-
 	if (4 != argc) {
 		perror(">> complete 4 words (ex. teeencrypt -e data.txt caesar)");
 		return 1;
 	}
+
+	ta_attrs ta;
+	TEEC_Operation op;
+
+	prepare_ta_session(&ta);
 
 	FILE* fp = fopen(argv[2], "r+");
 	if (fp == NULL) {
@@ -199,55 +201,77 @@ int main(int argc, char* argv[])
 	size_t fileSize = get_file_size(fp);
 	puts(">> file detected");
 
-	if (!strcmp(argv[3], "caesar")) {
-		word in = {(char*) calloc(fileSize, 1), fileSize};
-		word out = {(char*) calloc(fileSize, 1), fileSize};
+	word data[TEEC_CONFIG_PAYLOAD_REF_COUNT] = {NULL, };
+	char fileName[PATH_MAX];
+	realpath(argv[2], fileName);
+	char modifiedFileName[PATH_MAX];
 
-		prepare_op(&op, &in, &out);
-		fread(in.buffer, 1, in.length, fp);
+	if (!strcmp(argv[3], "caesar")) {
+		data[0] = (word) {(char*) calloc(fileSize, 1), fileSize};
+		data[1] = (word) {(char*) calloc(fileSize, 1), fileSize};
+
+		prepare_op(&op, data);
+		fread(data[0].buffer, 1, data[0].size, fp);
+
 		if (!strcmp(argv[1], "-e")) {
-			//
 			caesar_gen_keys(&ta);
 			caesar_encrypt(&ta, &op);
-			fp = freopen("/root/encrypted_caesar.txt", "w", fp);
-			fwrite(op.params[1].tmpref.buffer, 1, fileSize, fp);
+			fp = freopen(fileName, "w", fp);
+			fwrite(data[1].buffer, 1, data[1].size, fp);
 			fputc('\n', fp);
+
+			strcpy(modifiedFileName, fileName);
+			strcat(modifiedFileName, ".caesar");
 		}
 		else if (!strcmp(argv[1], "-d")) {
-			//
 			caesar_decrypt(&ta, &op);
-			fp = freopen("/root/decrypted_caesar.txt", "w", fp);
-			fwrite(op.params[1].tmpref.buffer, 1, fileSize - 1, fp);
+			fp = freopen(fileName, "w", fp);
+			fwrite(data[1].buffer, 1, data[1].size - 1, fp);
+
+			strcpy(modifiedFileName, fileName);
+			char* ptr = strrchr(modifiedFileName, '.');
+			if (strcmp(ptr, ".caesar")) {
+				perror("ERROR: Not encrypted file(.caesar)");
+				return 1;
+			}
+			memset(ptr, 0, strlen(ptr));
 		}
 		else{
 			goto no_option;
 		}
+		rename(fileName, modifiedFileName);
 	}
 	else if (!strcmp(argv[3], "rsa")) {
-		// if (!strcmp(argv[1], "-e")) {
-		// 	word in = {(char*) malloc(fileSize), fileSize};
-		// 	word out = {(char*) malloc(RSA_CIPHER_LEN_1024), RSA_CIPHER_LEN_1024};
+		if (!strcmp(argv[1], "-e")) {
+			data[0] = (word) {(char*) calloc(RSA_MAX_PLAIN_LEN_1024, 1), RSA_MAX_PLAIN_LEN_1024};
+			data[1] = (word) {(char*) calloc(RSA_CIPHER_LEN_1024, 1), RSA_CIPHER_LEN_1024};
 
-		// 	prepare_op(&op, &in, &out);
-		// 	fread(in.buffer, 1, in.length, fp);
-		// 	//
-		// 	rsa_gen_keys(&ta);
-		// 	rsa_encrypt(&ta, &op);
-		// 	fp = freopen("/root/encrypted_rsa.txt", "w", fp);
-		// }
+			prepare_op(&op, data);
+			fread(data[0].buffer, 1, data[0].size, fp);
+
+			rsa_gen_keys(&ta);
+			rsa_encrypt(&ta, &op);
+			fp = freopen(data[2].buffer, "w", fp);
+			fwrite(data[1].buffer, 1, data[1].size, fp);
+
+			strcpy(modifiedFileName, fileName);
+			strcat(modifiedFileName, ".rsa");
+		}
 		// else if (!strcmp(argv[1], "-d")) {
-		// 	word in = {(char*) malloc(RSA_CIPHER_LEN_1024), RSA_CIPHER_LEN_1024};
-		// 	word out = {(char*) malloc(fileSize), fileSize};
+		// 	word in = {(char*) calloc(RSA_CIPHER_LEN_1024, 1), RSA_CIPHER_LEN_1024};
+		// 	word out = {(char*) calloc(RSA_MAX_PLAIN_LEN_1024, 1), RSA_MAX_PLAIN_LEN_1024};
 
 		// 	prepare_op(&op, &in, &out);
 		// 	fread(in.buffer, 1, in.length, fp);
 		// 	//
 		// 	rsa_decrypt(&ta, &op);
 		// 	fp = freopen("/root/decrypted_rsa.txt", "w", fp);
+		// 	fwrite(out.buffer, 1, strlen(out.buffer), fp);
 		// }
-		// else{
-		// 	goto no_option;
-		// }
+		else{
+			goto no_option;
+		}
+		rename(data[2].buffer, data[3].buffer);
 	}
 	else {
 no_option:

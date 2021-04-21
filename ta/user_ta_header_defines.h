@@ -33,7 +33,7 @@
 #define USER_TA_HEADER_DEFINES_H
 
 /* To get the TA UUID definition */
-#include "ta_common.h"
+#include "teeencrypt_ta.h"
 
 #define TA_UUID				TA_TEEENCRYPT_UUID
 

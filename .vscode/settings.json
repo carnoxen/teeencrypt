@@ -1,0 +1,16 @@
+{
+    "cmake.configureOnOpen": true,
+    "files.associations": {
+        "teeencrypt_ta.h": "c",
+        "tee_internal_api.h": "c",
+        "tee_internal_api_extensions.h": "c",
+        "tee_client_api.h": "c",
+        "*.tcc": "c",
+        "string": "c",
+        "string_view": "c",
+        "ostream": "c",
+        "sstream": "c",
+        "utility": "c",
+        "string.h": "c"
+    }
+}
