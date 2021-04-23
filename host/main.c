@@ -27,7 +27,6 @@
 
 #include <err.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <limits.h>
 
@@ -38,95 +37,37 @@
 // common start
 
 typedef struct __ta_attrs {
-	TEEC_Context ctx;
-	TEEC_Session sess;
-} ta_attrs;
+	TEEC_Context context;
+	TEEC_Session session;
+	TEEC_Operation operation;
+} Attributes;
 
-typedef struct __word {
-	char* buffer;
-	size_t size;
-} word;
+typedef TEEC_TempMemoryReference Data;
 
-// common end
+#define PARAM_SIZE (TEEC_CONFIG_PAYLOAD_REF_COUNT - 2U)
 
-// caesar start
-
-void caesar_gen_keys(ta_attrs *ta) {
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, CAESAR_GENKEY, NULL, NULL);
-	if (res != TEEC_SUCCESS)
-		errx(1, "!> TEEC_InvokeCommand(CAESAR_GENKEY) failed %#x\n", res);
-    
-	puts("> Keys already generated.");
-}
-
-void caesar_encrypt(ta_attrs *ta, TEEC_Operation* op) {
-	puts("> CAESAR ENCRYPT CA SIDE");
-    
+static TEEC_Result prepare_ta_session(Attributes *attrsp) {
+	TEEC_UUID uuid = TA_TEEENCRYPT_UUID;
 	uint32_t origin;
 
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, CAESAR_ENC, op, &origin);
-	if (res != TEEC_SUCCESS)
-		errx(1, "!> TEEC_InvokeCommand(CAESAR_ENC) failed 0x%x origin 0x%x\n",
+	/* Initialize a context connecting us to the TEE */
+	TEEC_Result res = TEEC_InitializeContext(NULL, &(attrsp->context));
+	if (res != TEEC_SUCCESS) {
+		errx(1, "!> TEEC_InitializeContext failed with code 0x%x\n", res);
+		return res;
+	}
+
+	/* Open a session with the TA */
+	res = TEEC_OpenSession(&(attrsp->context), &(attrsp->session), &uuid,
+			       TEEC_LOGIN_PUBLIC, NULL, NULL, &origin);
+	if (res != TEEC_SUCCESS) {
+		errx(1, "!> TEEC_Opensession failed with code 0x%x origin 0x%x\n", 
 			res, origin);
+		return res;
+	}
 
-	printf("> The text sent was encrypted: %s\n", 
-		(char *)op->params[1].tmpref.buffer);
+	return res;
 }
-
-void caesar_decrypt(ta_attrs *ta, TEEC_Operation* op) {
-	puts("> CAESAR DECRYPT CA SIDE");
-
-	uint32_t origin;
-
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, CAESAR_DEC, op, &origin);
-	if (res != TEEC_SUCCESS)
-		errx(1, "!> TEEC_InvokeCommand(CAESAR_DEC) failed 0x%x origin 0x%x\n",
-			res, origin);
-
-	printf("> The text sent was decrypted: %s\n", 
-		(char *)op->params[1].tmpref.buffer);
-}
-
-// caesar end
-
-// rsa start
-
-void rsa_gen_keys(ta_attrs *ta) {
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, RSA_GENKEY, NULL, NULL);
-	if (res != TEEC_SUCCESS)
-		errx(1, "!> TEEC_InvokeCommand(RSA_GENKEYS) failed %#x\n", res);
-
-	puts("> Keys already generated.");
-}
-
-void rsa_encrypt(ta_attrs *ta, TEEC_Operation* op) {
-	puts("> RSA ENCRYPT CA SIDE");
-
-	uint32_t origin;
-	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, RSA_ENC, op, &origin);
-	if (res != TEEC_SUCCESS)
-		errx(1, "!> TEEC_InvokeCommand(TA_RSA_CMD_ENCRYPT) failed 0x%x origin 0x%x\n",
-			res, origin);
-
-	printf("> The text sent was encrypted: %s\n", (char *)op->params[1].tmpref.buffer);
-}
-
-// void rsa_decrypt(ta_attrs *ta, TEEC_Operation* op)
-// {
-// 	puts("\n============ RSA DECRYPT CA SIDE ============");
-
-// 	uint32_t origin;
-
-// 	TEEC_Result res = TEEC_InvokeCommand(&ta->sess, RSA_DEC, 
-// 		op, &origin);
-// 	if (res != TEEC_SUCCESS)
-// 		errx(1, "\nTEEC_InvokeCommand(TA_RSA_CMD_DECRYPT) failed 0x%x origin 0x%x\n",
-// 			res, origin);
-
-// 	printf("\nThe text sent was decrypted: %s\n", (char *)op->params[1].tmpref.buffer);
-// }
-
-// rsa end
 
 static size_t get_file_size(FILE* fp) {
 	fseek(fp, 0, SEEK_END);
@@ -136,41 +77,42 @@ static size_t get_file_size(FILE* fp) {
 	return fileSize;
 }
 
-static void prepare_ta_session(ta_attrs *ta) {
-	TEEC_UUID uuid = TA_TEEENCRYPT_UUID;
+static TEEC_Result send_to_ta(Attributes *attrsp, uint32_t command) {
 	uint32_t origin;
-
-	/* Initialize a context connecting us to the TEE */
-	TEEC_Result res = TEEC_InitializeContext(NULL, &ta->ctx);
+	TEEC_Result res = TEEC_InvokeCommand(&(attrsp->session), command, 
+		&(attrsp->operation), &origin);
 	if (res != TEEC_SUCCESS)
-		errx(1, "!> TEEC_InitializeContext failed with code 0x%x\n", res);
+		errx(1, "!> TEEC_InvokeCommand(%d) failed 0x%x origin 0x%x\n",
+			command, res, origin);
 
-	/* Open a session with the TA */
-	res = TEEC_OpenSession(&ta->ctx, &ta->sess, &uuid,
-			       TEEC_LOGIN_PUBLIC, NULL, NULL, &origin);
-	if (res != TEEC_SUCCESS)
-		errx(1, "!> TEEC_Opensession failed with code 0x%x origin 0x%x\n", 
-			res, origin);
+	return res;
 }
 
-static void terminate_tee_session(ta_attrs *ta) {
-	TEEC_CloseSession(&ta->sess);
-	TEEC_FinalizeContext(&ta->ctx);
+static void check_extention(char* extention, char* lookup) {
+	if (strcmp(extention, lookup)) {
+		perror("!> It's not an encrypted file");
+		exit(1);
+	}
 }
 
-static void prepare_op(TEEC_Operation *op, word data[]) {
-	memset(op, 0, sizeof(*op));
+static void prepare_op(TEEC_Operation *opp, Data data[]) {
+	memset(opp, 0, sizeof(*opp));
 
-	op->paramTypes = TEEC_PARAM_TYPES(
+	opp->paramTypes = TEEC_PARAM_TYPES(
 		TEEC_MEMREF_TEMP_INPUT,
 		TEEC_MEMREF_TEMP_OUTPUT,
 		TEEC_NONE,
-		TEEC_NONE);
+		TEEC_NONE
+	);
 
-	for (size_t i = 0; i < TEEC_CONFIG_PAYLOAD_REF_COUNT - 2; ++i) {
-		op->params[i].tmpref.buffer = data[i].buffer;
-		op->params[i].tmpref.size = data[i].size;
+	for (size_t i = 0; i < PARAM_SIZE; ++i) {
+		opp->params[i].tmpref = data[i];
 	}
+}
+
+static void terminate_tee_session(Attributes *attrsp) {
+	TEEC_CloseSession(&(attrsp->session));
+	TEEC_FinalizeContext(&(attrsp->context));
 }
 
 int main(int argc, char* argv[]) {
@@ -179,102 +121,87 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-	ta_attrs ta;
-	TEEC_Operation op;
+	Attributes attrs; TEEC_Result result = TEEC_ERROR_BAD_STATE;
+	prepare_ta_session(&attrs);
 
-	prepare_ta_session(&ta);
-
-	FILE* fp = fopen(argv[2], "r+");
+	FILE* fp = fopen(argv[2], "r");
 	if (fp == NULL) {
 		perror("!> file not found");
 		return 1;
 	}
-
-	size_t fileSize = get_file_size(fp);
 	puts("> file detected");
 
-	word data[TEEC_CONFIG_PAYLOAD_REF_COUNT] = {NULL, };
-	char fileName[PATH_MAX];
-	realpath(argv[2], fileName);
-	char modifiedFileName[PATH_MAX];
+	size_t fileSize = get_file_size(fp), outputSize = fileSize + 2;
+	void *input = calloc(fileSize + 2, 1), *output = calloc(fileSize + 2, 1);
+	fread(input, 1, fileSize, fp);
+
+	char name[PATH_MAX], nameModified[PATH_MAX];
+	realpath(argv[2], name);
+	strcpy(nameModified, name);
+
+	Data data[PARAM_SIZE] = {
+		(Data) {input, fileSize + 2},
+		(Data) {output, fileSize + 2}
+	};
+	prepare_op(&(attrs.operation), data);
 
 	if (!strcmp(argv[3], "caesar")) {
-		data[0] = (word) {(char*) calloc(fileSize, 1), fileSize};
-		data[1] = (word) {(char*) calloc(fileSize, 1), fileSize};
-
-		prepare_op(&op, data);
-		fread(data[0].buffer, 1, data[0].size, fp);
-
 		if (!strcmp(argv[1], "-e")) {
-			caesar_gen_keys(&ta);
-			caesar_encrypt(&ta, &op);
-
-			fp = freopen(fileName, "w", fp);
-			fwrite(data[1].buffer, 1, data[1].size, fp);
-			fputc('\n', fp);
-
-			strcpy(modifiedFileName, fileName);
-			strcat(modifiedFileName, ".caesar");
+			puts("> Caesar: encryption start");
+			strcat(nameModified, ".caesar");
+			result = send_to_ta(&attrs, CAESAR_ENC);
+			puts("> Caesar: encryption complete");
+			++fileSize;
 		}
 		else if (!strcmp(argv[1], "-d")) {
-			caesar_decrypt(&ta, &op);
-			
-			fp = freopen(fileName, "w", fp);
-			fwrite(data[1].buffer, 1, data[1].size - 1, fp);
-
-			strcpy(modifiedFileName, fileName);
-			char* ptr = strrchr(modifiedFileName, '.');
-			if (strcmp(ptr, ".caesar")) {
-				perror("!> ERROR: Not encrypted file(.caesar)");
-				return 1;
-			}
-			memset(ptr, 0, strlen(ptr));
+			puts("> Caesar: decryption start");
+			char *start = strrchr(nameModified, '.');
+			check_extention(start, ".caesar");
+			*start = '\0';
+			result = send_to_ta(&attrs, CAESAR_DEC);
+			puts("> Caesar: decryption complete");
+			--fileSize;
 		}
 		else{
 			goto no_option;
 		}
-		rename(fileName, modifiedFileName);
 	}
 	else if (!strcmp(argv[3], "rsa")) {
 		if (!strcmp(argv[1], "-e")) {
-			data[0] = (word) {(char*) calloc(RSA_MAX_PLAIN_LEN_1024, 1), RSA_MAX_PLAIN_LEN_1024};
-			data[1] = (word) {(char*) calloc(RSA_CIPHER_LEN_1024, 1), RSA_CIPHER_LEN_1024};
-
-			prepare_op(&op, data);
-			fread(data[0].buffer, 1, data[0].size, fp);
-
-			rsa_gen_keys(&ta);
-			rsa_encrypt(&ta, &op);
-
-			fp = freopen(data[2].buffer, "w", fp);
-			fwrite(data[1].buffer, 1, data[1].size, fp);
-
-			strcpy(modifiedFileName, fileName);
-			strcat(modifiedFileName, ".rsa");
+			puts("> RSA: encryption start");
+			strcat(nameModified, ".rsa");
+			data[0] = (Data) {realloc(input, RSA_MAX_PLAIN_LEN_1024), RSA_MAX_PLAIN_LEN_1024};
+			data[1] = (Data) {realloc(output, RSA_CIPHER_LEN_1024), RSA_CIPHER_LEN_1024};
+			prepare_op(&(attrs.operation), data);
+			result = send_to_ta(&attrs, RSA_ENC);
+			puts("> RSA: encryption complete");
+			fileSize = RSA_CIPHER_LEN_1024;
+			input = data[0].buffer;
+			output = data[1].buffer;
 		}
 		// else if (!strcmp(argv[1], "-d")) {
-		// 	word in = {(char*) calloc(RSA_CIPHER_LEN_1024, 1), RSA_CIPHER_LEN_1024};
-		// 	word out = {(char*) calloc(RSA_MAX_PLAIN_LEN_1024, 1), RSA_MAX_PLAIN_LEN_1024};
-
-		// 	prepare_op(&op, &in, &out);
-		// 	fread(in.buffer, 1, in.length, fp);
-		// 	//
-		// 	rsa_decrypt(&ta, &op);
-		// 	fp = freopen("/root/decrypted_rsa.txt", "w", fp);
-		// 	fwrite(out.buffer, 1, strlen(out.buffer), fp);
 		// }
 		else{
 			goto no_option;
 		}
-		rename(fileName, modifiedFileName);
 	}
 	else {
 no_option:
-		puts("!> no option found");
+		perror("!> no option found");
 	}
 
+	if (TEEC_SUCCESS != result) {
+		return 1;
+	}
+
+	fp = freopen(name, "w", fp);
+	fwrite(output, 1, fileSize, fp);
+	rename(name, nameModified);
 	fclose(fp);
-	terminate_tee_session(&ta);
+	terminate_tee_session(&attrs);
+
+	printf("input: %s\n", (char *)input);
+	printf("output: %s\n", (char *)output);
 
 	return 0;
 }

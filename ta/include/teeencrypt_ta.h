@@ -27,6 +27,8 @@
 #ifndef TA_COMMON_H
 #define TA_COMMON_H
 
+#include <string.h>
+
 /*
  * This UUID is generated with uuidgen
  * the ITU-T UUID generator at http://www.itu.int/ITU-T/asn1/uuid.html
@@ -36,18 +38,16 @@
 	{ 0xf8812010, 0xb4f7, 0x4a0f, \
 		{ 0xa2, 0x00, 0x83, 0xee, 0x4c, 0x0a, 0xb3, 0x50} }
 
-/* The function IDs implemented in this TA */
-
 #define RSA_KEY_SIZE 1024
 #define RSA_MAX_PLAIN_LEN_1024 86 // (1024/8) - 42 (padding)
 #define RSA_CIPHER_LEN_1024 (RSA_KEY_SIZE / 8)
 
+/* The function IDs implemented in this TA */
+
 typedef enum __TA_TEEENCRYPT_CMD {
-	CAESAR_GENKEY,
 	CAESAR_ENC,
 	CAESAR_DEC,
 
-	RSA_GENKEY,
 	RSA_ENC,
 	RSA_DEC
 } TA_TEEENCRYPT_CMD;

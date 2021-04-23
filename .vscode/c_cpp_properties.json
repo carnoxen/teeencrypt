@@ -5,7 +5,7 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/home/syssec/devel/optee/optee_client/**",
-                "/home/syssec/devel/optee/optee_os/**"
+                "/home/syssec/devel/optee/optee_os/lib/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
