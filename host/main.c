@@ -132,18 +132,17 @@ int main(int argc, char* argv[]) {
 	puts("> file detected");
 
 	size_t fileSize = get_file_size(fp), outputSize = fileSize + 2;
-	void *input = calloc(fileSize + 2, 1), *output = calloc(fileSize + 2, 1);
-	fread(input, 1, fileSize, fp);
 
 	char name[PATH_MAX], nameModified[PATH_MAX];
 	realpath(argv[2], name);
 	strcpy(nameModified, name);
 
 	Data data[PARAM_SIZE] = {
-		(Data) {input, fileSize + 2},
-		(Data) {output, fileSize + 2}
+		(Data) {calloc(fileSize + 2, 1), fileSize + 2},
+		(Data) {calloc(fileSize + 2, 1), fileSize + 2}
 	};
 	prepare_op(&(attrs.operation), data);
+	fread(data[0].buffer, 1, fileSize, fp);
 
 	if (!strcmp(argv[3], "caesar")) {
 		if (!strcmp(argv[1], "-e")) {
@@ -170,12 +169,11 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(argv[1], "-e")) {
 			puts("> RSA: encryption start");
 			strcat(nameModified, ".rsa");
-			data[1] = (Data) {realloc(output, RSA_CIPHER_LEN_1024), RSA_CIPHER_LEN_1024};
+			data[1] = (Data) {realloc(data[1].buffer, RSA_CIPHER_LEN_1024), RSA_CIPHER_LEN_1024};
 			prepare_op(&(attrs.operation), data);
 			result = send_to_ta(&attrs, RSA_ENC);
 			puts("> RSA: encryption complete");
 			fileSize = RSA_CIPHER_LEN_1024;
-			output = data[1].buffer;
 		}
 		// else if (!strcmp(argv[1], "-d")) {
 		// }
@@ -193,13 +191,13 @@ no_option:
 	}
 
 	fp = freopen(name, "w", fp);
-	fwrite(output, 1, fileSize, fp);
+	fwrite(data[1].buffer, 1, fileSize, fp);
 	rename(name, nameModified);
 	fclose(fp);
 	terminate_tee_session(&attrs);
 
-	printf("input: %s\n", (char *)input);
-	printf("output: %s\n", (char *)output);
+	printf("input: %s\n", (char *)data[0].buffer);
+	printf("output: %s\n", (char *)data[1].buffer);
 
 	return 0;
 }
