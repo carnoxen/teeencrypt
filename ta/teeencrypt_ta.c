@@ -57,8 +57,9 @@ static TEE_Result check_params(uint32_t param_types) {
 // caesar start
 
 static unsigned char caesar_key = -1;
-static const size_t LETTERS = 'z' - 'a' + 1;
+static const size_t LETTERS = 'z' - 'a' + 1; // number of alphabets
 
+// foward letter
 static unsigned char enc_letter(unsigned char c) {
 	if (islower(c)) {
 		return ((c - 'a' + caesar_key) % LETTERS) + 'a';
@@ -69,6 +70,7 @@ static unsigned char enc_letter(unsigned char c) {
 	return c;
 }
 
+// back letter
 static unsigned char dec_letter(unsigned char c) {
 	if (islower(c)) {
 		return ((c - 'a' + (LETTERS - caesar_key)) % LETTERS) + 'a';
@@ -79,9 +81,10 @@ static unsigned char dec_letter(unsigned char c) {
 	return c;
 }
 
+// key range: 1 ~ 25
 static TEE_Result caesar_create_key(void) {
 	TEE_GenerateRandom(&caesar_key, sizeof(caesar_key));
-	caesar_key = (caesar_key % (LETTERS - 1)) + 1; // key range: 1 ~ 25
+	caesar_key = (caesar_key % (LETTERS - 1)) + 1;
 	return TEE_SUCCESS;
 }
 
@@ -145,7 +148,8 @@ typedef struct __rsa_session {
 	TEE_ObjectHandle key_handle; /* Key handle */
 } RSASession;
 
-static TEE_Result prepare_rsa_operation(TEE_OperationHandle *handle, uint32_t alg, TEE_OperationMode mode, TEE_ObjectHandle key) {
+static TEE_Result prepare_rsa_operation(TEE_OperationHandle *handle, uint32_t alg, 
+					TEE_OperationMode mode, TEE_ObjectHandle key) {
 	TEE_ObjectInfo key_info;
 	TEE_Result res = TEE_GetObjectInfo1(key, &key_info);
 	if (res != TEE_SUCCESS) {
@@ -201,11 +205,11 @@ static TEE_Result rsa_encrypt(void *session, uint32_t param_types, TEE_Param par
 	void *plain_txt = params[0].memref.buffer;
 	uint32_t plain_len = params[0].memref.size;
 	void *cipher = params[1].memref.buffer;
-	uint32_t cipher_len = RSA_CIPHER_LEN_1024;
+	uint32_t cipher_len = params[1].memref.size;
 
 	DMSG("> Preparing encryption operation...\n");
-	res = prepare_rsa_operation(&(sess->op_handle), TEE_ALG_RSAES_PKCS1_V1_5, TEE_MODE_ENCRYPT, 
-		sess->key_handle);
+	res = prepare_rsa_operation(&(sess->op_handle), TEE_ALG_RSAES_PKCS1_V1_5, 
+				    TEE_MODE_ENCRYPT, sess->key_handle);
 	if (res != TEE_SUCCESS) {
 		EMSG("!> Failed to prepare RSA operation: 0x%x\n", res);
 		goto err;
@@ -272,10 +276,8 @@ err:
  * Called when the instance of the TA is created. This is the first call in
  * the TA.
  */
-TEE_Result TA_CreateEntryPoint(void)
-{
+TEE_Result TA_CreateEntryPoint(void) {
 	DMSG("has been called");
-
 	return TEE_SUCCESS;
 }
 
@@ -283,8 +285,7 @@ TEE_Result TA_CreateEntryPoint(void)
  * Called when the instance of the TA is destroyed if the TA has not
  * crashed or panicked. This is the last call in the TA.
  */
-void TA_DestroyEntryPoint(void)
-{
+void TA_DestroyEntryPoint(void) {
 	DMSG("has been called");
 }
 
@@ -296,8 +297,7 @@ void TA_DestroyEntryPoint(void)
  */
 TEE_Result TA_OpenSessionEntryPoint(uint32_t __maybe_unused param_types,
 		TEE_Param __maybe_unused params[4],
-		void **session)
-{
+		void **session) {
 	RSASession *sess = TEE_Malloc(sizeof(*sess), 0);
 	if (!sess)
 		return TEE_ERROR_OUT_OF_MEMORY;
@@ -315,8 +315,7 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t __maybe_unused param_types,
  * Called when a session is closed, sess_ctx hold the value that was
  * assigned by TA_OpenSessionEntryPoint().
  */
-void TA_CloseSessionEntryPoint(void *session)
-{
+void TA_CloseSessionEntryPoint(void *session) {
 	/* Get ciphering context from session ID */
 	DMSG("> Session %p: release session", session);
 	RSASession* sess = (RSASession *)session;
@@ -336,8 +335,7 @@ void TA_CloseSessionEntryPoint(void *session)
  * comes from normal world.
  */
 TEE_Result TA_InvokeCommandEntryPoint(void *session, uint32_t cmd,
-			uint32_t param_types, TEE_Param params[4])
-{
+			uint32_t param_types, TEE_Param params[4]) {
 	if (check_params(param_types) != TEE_SUCCESS)
 		return TEE_ERROR_BAD_PARAMETERS;
 
