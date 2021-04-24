@@ -77,6 +77,7 @@ static size_t get_file_size(FILE* fp) {
 	return fileSize;
 }
 
+// invoke command to TA
 static TEEC_Result send_to_ta(Attributes *attrsp, uint32_t command) {
 	uint32_t origin;
 	TEEC_Result res = TEEC_InvokeCommand(&(attrsp->session), command, 
@@ -88,6 +89,7 @@ static TEEC_Result send_to_ta(Attributes *attrsp, uint32_t command) {
 	return res;
 }
 
+// is file extention ".caesar"?
 static void check_extention(char* extention, char* lookup) {
 	if (strcmp(extention, lookup)) {
 		perror("!> It's not an encrypted file");
