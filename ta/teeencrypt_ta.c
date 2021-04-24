@@ -199,11 +199,9 @@ static TEE_Result rsa_encrypt(void *session, uint32_t param_types, TEE_Param par
 	RSASession *sess = (RSASession *)session;
 
 	void *plain_txt = params[0].memref.buffer;
-	uint32_t plain_len = RSA_MAX_PLAIN_LEN_1024;
+	uint32_t plain_len = params[0].memref.size;
 	void *cipher = params[1].memref.buffer;
 	uint32_t cipher_len = RSA_CIPHER_LEN_1024;
-
-	DMSG("> input: %s\n", (char *)plain_txt);
 
 	DMSG("> Preparing encryption operation...\n");
 	res = prepare_rsa_operation(&(sess->op_handle), TEE_ALG_RSAES_PKCS1_V1_5, TEE_MODE_ENCRYPT, 
@@ -212,7 +210,6 @@ static TEE_Result rsa_encrypt(void *session, uint32_t param_types, TEE_Param par
 		EMSG("!> Failed to prepare RSA operation: 0x%x\n", res);
 		goto err;
 	}
-	DMSG("handle: %x", sess->op_handle);
 
 	res = TEE_AsymmetricEncrypt(sess->op_handle, (TEE_Attribute *)NULL, 0,
 					plain_txt, plain_len, cipher, &cipher_len);					

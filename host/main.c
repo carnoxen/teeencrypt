@@ -170,13 +170,11 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(argv[1], "-e")) {
 			puts("> RSA: encryption start");
 			strcat(nameModified, ".rsa");
-			data[0] = (Data) {realloc(input, RSA_MAX_PLAIN_LEN_1024), RSA_MAX_PLAIN_LEN_1024};
 			data[1] = (Data) {realloc(output, RSA_CIPHER_LEN_1024), RSA_CIPHER_LEN_1024};
 			prepare_op(&(attrs.operation), data);
 			result = send_to_ta(&attrs, RSA_ENC);
 			puts("> RSA: encryption complete");
 			fileSize = RSA_CIPHER_LEN_1024;
-			input = data[0].buffer;
 			output = data[1].buffer;
 		}
 		// else if (!strcmp(argv[1], "-d")) {
