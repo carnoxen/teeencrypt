@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
 	prepare_op(&(attrs.operation), data);
 	fread(data[0].buffer, 1, fileSize, fp);
 
-	if (!strcmp(argv[3], "caesar")) {
+	if (!strcmp(argv[3], "Caesar")) {
 		if (!strcmp(argv[1], "-e")) {
 			puts("> Caesar: encryption start");
 			strcat(nameModified, ".caesar");
@@ -167,7 +167,7 @@ int main(int argc, char* argv[]) {
 			goto no_option;
 		}
 	}
-	else if (!strcmp(argv[3], "rsa")) {
+	else if (!strcmp(argv[3], "RSA")) {
 		if (!strcmp(argv[1], "-e")) {
 			puts("> RSA: encryption start");
 			strcat(nameModified, ".rsa");

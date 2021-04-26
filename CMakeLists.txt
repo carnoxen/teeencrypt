@@ -1,4 +1,4 @@
-project (teeencrypt C)
+project (TEEencrypt C)
 
 set (SRC host/main.c)
 
