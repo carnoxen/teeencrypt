@@ -34,6 +34,8 @@
 
 // common start
 
+#define CAESAR_ROOT 'A'
+
 static TEE_Result check_params(uint32_t param_types) {
 	const uint32_t exp_param_types =
 		TEE_PARAM_TYPES(
@@ -105,7 +107,7 @@ static TEE_Result caesar_encrypt(TEE_Param params[4]) {
 		out[i] = enc_letter(in[i]);
 	}
 
-	out[in_len - 1] = caesar_key + 'A';
+	out[in_len - 1] = caesar_key + CAESAR_ROOT;
 	out[in_len] = '\n';
 
 	DMSG("> Caesar: Encryption\n");
@@ -120,7 +122,7 @@ static TEE_Result caesar_decrypt(TEE_Param params[4]) {
 	size_t in_len = strlen(params[0].memref.buffer);
 	char* out = (char*) params[1].memref.buffer;
 
-	caesar_key = in[in_len - 2] - 'A';
+	caesar_key = in[in_len - 2] - CAESAR_ROOT;
 
 	DMSG("> Caesar: Key Retrived \n");
 	DMSG(">> Key :  %d\n", caesar_key);
