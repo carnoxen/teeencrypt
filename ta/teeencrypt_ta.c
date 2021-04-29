@@ -34,7 +34,7 @@
 
 // common start
 
-#define CAESAR_ROOT 'A'
+#define CAESAR_ROOT 'A' // caesar root key
 
 static TEE_Result check_params(uint32_t param_types) {
 	const uint32_t exp_param_types =
