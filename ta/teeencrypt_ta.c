@@ -34,8 +34,6 @@
 
 // common start
 
-#define CAESAR_ROOT 'A' // caesar root key
-
 static TEE_Result check_params(uint32_t param_types) {
 	const uint32_t exp_param_types =
 		TEE_PARAM_TYPES(
@@ -58,6 +56,7 @@ static TEE_Result check_params(uint32_t param_types) {
 
 // caesar start
 
+static const size_t CAESAR_ROOT = 'A'; // caesar root key
 static unsigned char caesar_key = -1;
 static const size_t LETTERS = 'z' - 'a' + 1; // number of alphabets
 
