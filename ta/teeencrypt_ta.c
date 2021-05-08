@@ -234,43 +234,6 @@ err:
 	return res;
 }
 
-// static TEE_Result rsa_decrypt(void *session, uint32_t param_types, TEE_Param params[4]) {
-// 	TEE_Result ret;
-// 	uint32_t rsa_alg = TEE_ALG_RSAES_PKCS1_V1_5;
-// 	struct __rsa_session *sess = (struct __rsa_session *)session;
-
-// 	if (check_params(param_types) != TEE_SUCCESS)
-// 		return TEE_ERROR_BAD_PARAMETERS;
-
-// 	void *plain_txt = params[1].memref.buffer;
-// 	size_t plain_len = params[1].memref.size;
-// 	void *cipher = params[0].memref.buffer;
-// 	size_t cipher_len = params[0].memref.size;
-
-// 	DMSG("\n========== Preparing decryption operation ==========\n");
-// 	ret = prepare_rsa_operation(&sess->op_handle, rsa_alg, TEE_MODE_DECRYPT, sess->key_handle);
-// 	if (ret != TEE_SUCCESS) {
-// 		EMSG("\nFailed to prepare RSA operation: 0x%x\n", ret);
-// 		goto err;
-// 	}
-
-// 	DMSG("\nData to decrypt: %s\n", (char *) cipher);
-// 	ret = TEE_AsymmetricDecrypt(sess->op_handle, (TEE_Attribute *)NULL, 0,
-// 				cipher, cipher_len, plain_txt, &plain_len);
-// 	if (ret != TEE_SUCCESS) {
-// 		EMSG("\nFailed to decrypt the passed buffer: 0x%x\n", ret);
-// 		goto err;
-// 	}
-// 	DMSG("\nDecrypted data: %s\n", (char *) plain_txt);
-// 	DMSG("\n========== Decryption successfully ==========\n");
-// 	return ret;
-
-// err:
-// 	TEE_FreeOperation(sess->op_handle);
-// 	TEE_FreeTransientObject(sess->key_handle);
-// 	return ret;
-// }
-
 // rsa end
 
 /*
