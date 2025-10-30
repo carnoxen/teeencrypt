@@ -58,26 +58,26 @@ static TEE_Result check_params(uint32_t param_types) {
 
 static const size_t CAESAR_ROOT = 'A'; // caesar root key
 static unsigned char caesar_key = -1;
-static const size_t LETTERS = 'z' - 'a' + 1; // number of alphabets
+static const size_t ALPHABET_COUNT = 'Z' - CAESAR_ROOT + 1; // number of alphabets
+
+static size_t change_root(unsigned char c) {
+	return islower(c) ? tolower(CAESAR_ROOT) : CAESAR_ROOT;
+}
 
 // foward letter
 static unsigned char enc_letter(unsigned char c) {
-	if (islower(c)) {
-		return ((c - 'a' + caesar_key) % LETTERS) + 'a';
-	}
-	else if (isupper(c)){
-		return ((c - 'A' + caesar_key) % LETTERS) + 'A';
+	if (isalpha(c)){
+		const size_t ROOT = change_root(c);
+		return ((c - ROOT + caesar_key) % ALPHABET_COUNT) + ROOT;
 	}
 	return c;
 }
 
 // back letter
 static unsigned char dec_letter(unsigned char c) {
-	if (islower(c)) {
-		return ((c - 'a' + (LETTERS - caesar_key)) % LETTERS) + 'a';
-	}
-	else if (isupper(c)){
-		return ((c - 'A' + (LETTERS - caesar_key)) % LETTERS) + 'A';
+	if (isalpha(c)){
+		const size_t ROOT = change_root(c);
+		return ((c - ROOT + (ALPHABET_COUNT - caesar_key)) % ALPHABET_COUNT) + ROOT;
 	}
 	return c;
 }
@@ -85,7 +85,7 @@ static unsigned char dec_letter(unsigned char c) {
 // key range: 1 ~ 25
 static TEE_Result caesar_create_key(void) {
 	TEE_GenerateRandom(&caesar_key, sizeof(caesar_key));
-	caesar_key = (caesar_key % (LETTERS - 1)) + 1;
+	caesar_key = (caesar_key % (ALPHABET_COUNT - 1)) + 1;
 	return TEE_SUCCESS;
 }
 
